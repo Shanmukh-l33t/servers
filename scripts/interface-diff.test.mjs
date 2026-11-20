@@ -125,6 +125,23 @@ test("main exits 2 on a bad command line, before building anything", async (t) =
   assert.match(String(error.mock.calls[0]?.arguments[0]), /unknown argument/);
 });
 
+test("an unresolvable default base keeps git's own diagnostic", async (t) => {
+  // GIT_DIR pointing nowhere makes `git rev-parse` fail without a network
+  // fetch; that stderr is the point, so it must not be replaced by the hint.
+  const error = t.mock.method(console, "error", () => {});
+  const gitDir = process.env.GIT_DIR;
+  process.env.GIT_DIR = "no-such-repository-5636";
+  try {
+    assert.equal(await main([]), 1);
+  } finally {
+    if (gitDir === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = gitDir;
+  }
+  const printed = String(error.mock.calls[0]?.arguments[0]);
+  assert.match(printed, /fatal: not a git repository/);
+  assert.match(printed, /--base <ref>/);
+});
+
 test("an identical interface is unchanged", () => {
   const v = classify(
     cliJson({

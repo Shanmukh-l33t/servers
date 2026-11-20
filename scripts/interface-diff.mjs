@@ -330,9 +330,11 @@ function resolveBase(base) {
   if (base) return git("rev-parse", "--verify", `${base}^{commit}`);
   try {
     git("rev-parse", "--verify", DEFAULT_BASE_BRANCH);
-  } catch {
+  } catch (err) {
+    // Keep git's own diagnostic: the ref can fail for reasons a fetch cannot
+    // fix (not a repository, dubious ownership, git not on PATH).
     throw new Error(
-      `${DEFAULT_BASE_BRANCH} is not available to compare against. Run \`git fetch origin v2/main\`, or name a base with --base <ref>.`,
+      `${err.message.trim()}\n${DEFAULT_BASE_BRANCH} could not be resolved. If the ref is only missing, run \`git fetch origin v2/main\`; otherwise fix the git error above, or name a base with --base <ref>.`,
     );
   }
   return git("merge-base", "HEAD", DEFAULT_BASE_BRANCH);
