@@ -1148,7 +1148,26 @@ async def test_git_branch_local(repo: git.Repo):
     repo.git.branch("feature")
     assert await call(
         None, "git_branch", {"repo_path": str(root_of(repo)), "branch_type": "local"}
-    ) == text_result("  feature\n* main")
+    ) == text_result("feature\nmain")
+
+
+async def test_git_branch_names_are_clean_refs(tmp_path: Path, repo: git.Repo):
+    """#5641: no '* ', '+ ' or color, so a returned name resolves as a ref.
+
+    A worktree holding `feature` prints it with '+' and the active branch with
+    '*' in the CLI listing; `color.branch=always` adds escape sequences. None
+    may reach the client, whose next call passes the name straight back.
+    """
+    repo.git.branch("feature")
+    repo.git.worktree("add", str(tmp_path / "wt"), "feature")
+    repo.git.config("color.branch", "always")
+    root = str(root_of(repo))
+    result = await call(None, "git_branch", {"repo_path": root, "branch_type": "local"})
+    text = result["content"][0]["text"]
+    assert text.splitlines() == ["feature", "main"]
+    assert "\x1b" not in text
+    shown = await call(None, "git_show", {"repo_path": root, "revision": "feature"})
+    assert shown["isError"] is False
 
 
 async def test_git_branch_remote_and_all(tmp_path: Path, repo: git.Repo):
@@ -1159,7 +1178,7 @@ async def test_git_branch_remote_and_all(tmp_path: Path, repo: git.Repo):
         remote = await call(
             None, "git_branch", {"repo_path": str(clone_root), "branch_type": "remote"}
         )
-        assert remote == text_result(clone.git.branch("-r"))
+        assert remote == text_result(clone.git.branch("-r", format="%(refname:short)"))
         assert "origin/main" in remote["content"][0]["text"]
         assert "local-only" not in remote["content"][0]["text"]
         everything = await call(
@@ -1167,7 +1186,7 @@ async def test_git_branch_remote_and_all(tmp_path: Path, repo: git.Repo):
         )
         text = everything["content"][0]["text"]
         assert "local-only" in text
-        assert "remotes/origin/main" in text
+        assert "origin/main" in text
     finally:
         clone.close()
 
@@ -1182,13 +1201,13 @@ async def test_git_branch_contains_and_not_contains(repo: git.Repo):
         "git_branch",
         {"repo_path": root, "branch_type": "local", "contains": commit.hexsha},
     )
-    assert contains == text_result("  feature")
+    assert contains == text_result("feature")
     not_contains = await call(
         None,
         "git_branch",
         {"repo_path": root, "branch_type": "local", "not_contains": commit.hexsha},
     )
-    assert not_contains == text_result("* main")
+    assert not_contains == text_result("main")
 
 
 async def test_git_branch_unknown_type_is_error(repo: git.Repo):

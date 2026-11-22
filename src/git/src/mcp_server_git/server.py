@@ -1131,8 +1131,14 @@ def git_branch(
         case _:
             raise ValueError(f"Invalid branch type: {branch_type}")
 
-    # None value will be auto deleted by GitPython
-    branch_info = repo.git.branch(b_type, *contains_sha, *not_contains_sha)
+    # None value will be auto deleted by GitPython. The format drops the CLI
+    # decorations ('*', '+', color) so a returned name resolves as a ref (#5641).
+    branch_info = repo.git.branch(
+        b_type,
+        *contains_sha,
+        *not_contains_sha,
+        format="%(refname:short)",
+    )
 
     return branch_info
 
