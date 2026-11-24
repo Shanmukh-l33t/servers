@@ -1495,10 +1495,12 @@ export function createServer(
       const { deletedCount, missingEntities } =
         await knowledgeGraphManager.deleteObservations(deletions);
       notifyGraphUpdated();
-      const requested = deletions.reduce(
-        (total, d) => total + d.observations.length,
-        0,
-      );
+      // Count distinct (entity, observation) pairs: a repeated item matches the same record.
+      const requested = new Set(
+        deletions.flatMap((d) =>
+          d.observations.map((o) => JSON.stringify([d.entityName, o])),
+        ),
+      ).size;
       const message =
         deletedCount === requested
           ? "Observations deleted successfully"
@@ -1540,10 +1542,14 @@ export function createServer(
       const { deletedCount } =
         await knowledgeGraphManager.deleteRelations(relations);
       notifyGraphUpdated();
+      // Count distinct relations: a repeated item matches the same record.
+      const requested = new Set(
+        relations.map((r) => JSON.stringify([r.from, r.to, r.relationType])),
+      ).size;
       const message =
-        deletedCount === relations.length
+        deletedCount === requested
           ? "Relations deleted successfully"
-          : `Deleted ${deletedCount} of ${relations.length} relations. The rest matched nothing.`;
+          : `Deleted ${deletedCount} of ${requested} relations. The rest matched nothing.`;
       return {
         content: [{ type: "text" as const, text: message }],
         structuredContent: { success: true, message },

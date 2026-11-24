@@ -860,6 +860,33 @@ describe("memory tools over the protocol", () => {
       });
     });
 
+    it("counts a repeated observation once", async () => {
+      const result = await call(client, "delete_observations", {
+        deletions: [
+          { entityName: "Alice", observations: ["likes tea", "likes tea"] },
+          { entityName: "Alice", observations: ["likes tea", "never said"] },
+        ],
+      });
+      const message = "Deleted 1 of 2 observations.";
+      expect(result).toEqual({
+        content: [{ type: "text", text: message }],
+        structuredContent: { success: true, message },
+      });
+    });
+
+    it("reports success when a repeated observation was removed", async () => {
+      const result = await call(client, "delete_observations", {
+        deletions: [
+          { entityName: "Alice", observations: ["likes tea", "likes tea"] },
+        ],
+      });
+      const message = "Observations deleted successfully";
+      expect(result).toEqual({
+        content: [{ type: "text", text: message }],
+        structuredContent: { success: true, message },
+      });
+    });
+
     it("names entities that do not exist", async () => {
       const result = await call(client, "delete_observations", {
         deletions: [
@@ -905,6 +932,36 @@ describe("memory tools over the protocol", () => {
       expect(await readGraph()).toEqual({
         entities: [alice, bob, acme],
         relations: [aliceKnowsBob, aliceWorksAtAcme],
+      });
+    });
+
+    it("counts a repeated relation once", async () => {
+      const result = await call(client, "delete_relations", {
+        relations: [
+          aliceKnowsBob,
+          aliceKnowsBob,
+          { ...aliceKnowsBob, relationType: "likes" },
+        ],
+      });
+      const message = "Deleted 1 of 2 relations. The rest matched nothing.";
+      expect(result).toEqual({
+        content: [{ type: "text", text: message }],
+        structuredContent: { success: true, message },
+      });
+    });
+
+    it("reports success when a repeated relation was removed", async () => {
+      const result = await call(client, "delete_relations", {
+        relations: [aliceKnowsBob, aliceKnowsBob],
+      });
+      const message = "Relations deleted successfully";
+      expect(result).toEqual({
+        content: [{ type: "text", text: message }],
+        structuredContent: { success: true, message },
+      });
+      expect(await readGraph()).toEqual({
+        entities: [alice, bob, acme],
+        relations: [aliceWorksAtAcme],
       });
     });
 
